@@ -13,10 +13,10 @@ controller:
   resources:
     requests:
       cpu: 4
-      memory: 12G
+      memory: 16G
     limits:
       cpu: 8
-      memory: 16G
+      memory: 20G
   javaOpts: -server -XX:+AlwaysPreTouch -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent -XX:+ParallelRefProcEnabled -XX:+UseStringDeduplication -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=40 -Xms8G -Xmx8G
   installPlugins:
     - job-dsl:1.87
@@ -25,7 +25,7 @@ controller:
     - git:5.2.1
     - workflow-job:1400.v7fd111b_ec82f
     - workflow-cps
-    - junit:1259.v65ffcef24a_88
+    - junit:1265.v65b_14fa_f12f0
     - workflow-aggregator:596.v8c21c963d92d
     - blueocean:1.27.11
     - ws-cleanup:0.45
@@ -33,8 +33,9 @@ controller:
     - test-stability:2.3
     - copyartifact:722.v0662a_9b_e22a_c
   node-selector:
-    cassandra.jenkins: controller
+    cassandra.jenkins.controller: true
   scriptApproval:
+    - "staticMethod java.lang.System setProperty java.lang.String java.lang.String"
     - "staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods combinations java.util.Collection"
     - "staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods inspect java.lang.Object"
     - "staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods max java.util.Collection"
@@ -63,6 +64,8 @@ controller:
                   }
                 }
               }
+    globalDefaultFlowDurabilityLevel:
+      durabilityHint: "PERFORMANCE_OPTIMIZED"
     securityRealm: |-
       local:
         allowsSignup: false
@@ -74,15 +77,20 @@ controller:
     authorizationStrategy: |-
       loggedInUsersCanDoAnything:
         allowAnonymousRead: false
+    googlePodMonitor:
+        enabled: true
 agent:
   disableDefaultAgent: true
-  containerCap: 200
+  maxRequestsPerHostStr: "3200"
+  containerCap: 300
   node-selector:
-    cassandra.jenkins: agent
+    cassandra.jenkins.agent: true
+  waitForPodSec: "180"
   podTemplates:
     agent-dind-small: |
       - name: agent-dind-small
         label: agent-dind cassandra-small cassandra-amd64-small
+        nodeSelector: 'cassandra.jenkins.agent.small=true'
         activeDeadlineSeconds: '0'
         idleMinutes: 1
         instanceCap: 50
@@ -108,8 +116,12 @@ agent:
               - envVar:
                   key: DOCKER_HOST
                   value: tcp://localhost:2376
-            # FIXME this needs to be from apache/
-            # and we want to implement harbour as an in-cluster docker registry cache :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
+              - envVar:
+                  key: JENKINS_JAVA_OPTS
+                  value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
+            # there's a lot of docker pulls,
+            # TODO implement harbour as an in-cluster docker registry cache :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
+            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
             image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
             livenessProbe:
               failureThreshold: '0'
@@ -117,11 +129,11 @@ agent:
               periodSeconds: '0'
               successThreshold: '0'
               timeoutSeconds: '0'
-            privileged: 'false'
+            privileged: 'true'
             resourceRequestCpu: 1
             resourceLimitCpu: 2
             resourceRequestMemory: 1G
-            resourceLimitMemory: 2G
+            resourceLimitMemory: 1G
             ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
           - name: dind
@@ -145,7 +157,7 @@ agent:
             resourceRequestCpu: 2
             resourceLimitCpu: 4
             resourceRequestMemory: 1G
-            resourceLimitMemory: 1G
+            resourceLimitMemory: 2400M
             ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
         volumes:
@@ -158,10 +170,11 @@ agent:
     agent-dind-medium: |
       - name: agent-dind-medium
         label: agent-dind cassandra-medium cassandra-amd64-medium
+        nodeSelector: 'cassandra.jenkins.agent.medium=true'
         activeDeadlineSeconds: '0'
         idleMinutes: 1
-        instanceCap: 140
-        instanceCapStr: "140"
+        instanceCap: 100
+        instanceCapStr: "100"
         nodeUsageMode: "NORMAL"
         showRawYaml: 'true'
         slaveConnectTimeout: '30'
@@ -183,9 +196,10 @@ agent:
               - envVar:
                   key: DOCKER_HOST
                   value: tcp://localhost:2376
-            # image: <DOCKER_SLAVE_IMAGE>:latest  # FROM jenkins/inbound-agent, install dockeri cli
-            # this needs to be from apache/
-            # and we want to implement harbour as an in-cluster docker registry cache :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
+              - envVar:
+                  key: JENKINS_JAVA_OPTS
+                  value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
+            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
             image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
             livenessProbe:
               failureThreshold: '0'
@@ -193,12 +207,12 @@ agent:
               periodSeconds: '0'
               successThreshold: '0'
               timeoutSeconds: '0'
-            privileged: 'false'
+            privileged: 'true'
             resourceRequestCpu: 1
             resourceLimitCpu: 3
             resourceRequestMemory: 1G
-            resourceLimitMemory: 2G
-            ttyEnabled: 'false'
+            resourceLimitMemory: 1G
+            ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
           - name: dind
             alwaysPullImage: 'false'
@@ -220,9 +234,9 @@ agent:
             privileged: 'true'
             resourceRequestCpu: 2
             resourceLimitCpu: 4
-            resourceRequestMemory: 5G
-            resourceLimitMemory: 6G
-            ttyEnabled: 'false'
+            resourceRequestMemory: 4800M
+            resourceLimitMemory: 5G
+            ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
         volumes:
           - emptyDirVolume:
@@ -234,10 +248,11 @@ agent:
     agent-dind-large: |
       - name: agent-dind-large
         label: agent-dind cassandra-amd64-large
+        nodeSelector: 'cassandra.jenkins.agent.large=true'
         activeDeadlineSeconds: '0'
         idleMinutes: 1
-        instanceCap: 140
-        instanceCapStr: "140"
+        instanceCap: 200
+        instanceCapStr: "200"
         nodeUsageMode: "NORMAL"
         showRawYaml: 'true'
         slaveConnectTimeout: '30'
@@ -259,9 +274,10 @@ agent:
               - envVar:
                   key: DOCKER_HOST
                   value: tcp://localhost:2376
-            # image: <DOCKER_SLAVE_IMAGE>:latest  # FROM jenkins/inbound-agent, install dockeri cli
-            # this needs to be from apache/
-            # and we want to implement harbour as an in-cluster docker registry cache :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
+              - envVar:
+                  key: JENKINS_JAVA_OPTS
+                  value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
+            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
             image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
             livenessProbe:
               failureThreshold: '0'
@@ -269,12 +285,12 @@ agent:
               periodSeconds: '0'
               successThreshold: '0'
               timeoutSeconds: '0'
-            privileged: 'false'
+            privileged: 'true'
             resourceRequestCpu: 1
             resourceLimitCpu: 3
             resourceRequestMemory: 1G
             resourceLimitMemory: 2G
-            ttyEnabled: 'false'
+            ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
           - name: dind
             alwaysPullImage: 'false'
@@ -297,8 +313,8 @@ agent:
             resourceRequestCpu: 6
             resourceLimitCpu: 7
             resourceRequestMemory: 13G
-            resourceLimitMemory: 15G
-            ttyEnabled: 'false'
+            resourceLimitMemory: 16G
+            ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
         volumes:
           - emptyDirVolume:
