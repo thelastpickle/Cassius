@@ -30,6 +30,7 @@ gcloud container clusters create ${CLUSTER_NAME} --machine-type e2-standard-8 --
 gcloud container node-pools create agents-small --cluster ${CLUSTER_NAME} --machine-type n2-highcpu-4 --disk-type=pd-ssd --enable-autoscaling --spot --num-nodes=0 --min-nodes=0 --max-nodes=50 --node-labels=cassandra.jenkins.agent=true,cassandra.jenkins.agent.small=true --zone ${ZONE}
 
 # medium resource nodes
+#  preference (by cost): n2-highcpu-8, c3-highcpu-8, n4-highcpu-8, n1-highcpu-16
 gcloud container node-pools create agents-medium --cluster ${CLUSTER_NAME} --machine-type n2-highcpu-8 --disk-type=pd-ssd --enable-autoscaling --spot --num-nodes=0 --min-nodes=0 --max-nodes=100 --node-labels=cassandra.jenkins.agent=true,cassandra.jenkins.agent.medium=true --zone ${ZONE}
 
 # large resource nodes

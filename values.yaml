@@ -54,9 +54,9 @@ controller:
                     scm {
                       git {
                         remote {
-                          url('https://github.com/thelastpickle/cassandra')
+                          url('https://github.com/apache/cassandra')
                         }
-                        branch('mck/18594/5.0')
+                        branch('cassandra-5.0')
                         scriptPath('.jenkins/Jenkinsfile')
                       }
                     }
@@ -118,11 +118,10 @@ agent:
                   value: tcp://localhost:2376
               - envVar:
                   key: JENKINS_JAVA_OPTS
-                  value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
+                  value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true -Xlog:gc+heap+exit -XX:+HeapDumpOnOutOfMemoryError'
             # there's a lot of docker pulls,
-            # TODO implement harbour as an in-cluster docker registry cache :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
-            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
-            image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
+            # TODO implement option for docker registry caches :: https://medium.com/@elementtech.dev/kubernetes-image-proxy-cache-from-minutes-to-milliseconds-fd14173e831f
+            image: apache.jfrog.io/cassan-docker/apache/cassandra-jenkins-k8s
             livenessProbe:
               failureThreshold: '0'
               initialDelaySeconds: '0'
@@ -199,8 +198,7 @@ agent:
               - envVar:
                   key: JENKINS_JAVA_OPTS
                   value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
-            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
-            image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
+            image: apache.jfrog.io/cassan-docker/apache/cassandra-jenkins-k8s
             livenessProbe:
               failureThreshold: '0'
               initialDelaySeconds: '0'
@@ -211,7 +209,7 @@ agent:
             resourceRequestCpu: 1
             resourceLimitCpu: 3
             resourceRequestMemory: 1G
-            resourceLimitMemory: 1G
+            resourceLimitMemory: 2400M
             ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
           - name: dind
@@ -234,7 +232,7 @@ agent:
             privileged: 'true'
             resourceRequestCpu: 2
             resourceLimitCpu: 4
-            resourceRequestMemory: 4800M
+            resourceRequestMemory: 3400M
             resourceLimitMemory: 5G
             ttyEnabled: 'true'
             workingDir: /home/jenkins/agent
@@ -277,8 +275,7 @@ agent:
               - envVar:
                   key: JENKINS_JAVA_OPTS
                   value: '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.USE_BINARY_WRAPPER=true'
-            #image: apache/cassandra-jenkinsci-k8s-inbound-agent-dind:latest
-            image: hadesarchitect/jenkins-inbound-agent-dind:linux-amd64
+            image: apache.jfrog.io/cassan-docker/apache/cassandra-jenkins-k8s
             livenessProbe:
               failureThreshold: '0'
               initialDelaySeconds: '0'
